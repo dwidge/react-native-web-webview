@@ -1,14 +1,11 @@
 {
   "compilerOptions": {
-    "rootDir": ".",
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "jsx": "react-jsx",
-    "lib": [
-      "DOM"
-    ],
+    "lib": ["DOM"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noFallthroughCasesInSwitch": true,
@@ -22,6 +19,14 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "ESNext",
-    "verbatimModuleSyntax": true
-  }
+    "composite": true,
+    "outDir": "dist/esm",
+    "rootDir": "src",
+    "verbatimModuleSyntax": false,
+    "declaration": true,
+    "declarationDir": "dist/types",
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src"]
 }

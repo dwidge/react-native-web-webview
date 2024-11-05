@@ -11,7 +11,7 @@ import WebView, { type WebViewProps } from "react-native-webview";
 import type { WebViewSourceHtml } from "react-native-webview/lib/WebViewTypes";
 import { replaceLast } from "./utils";
 
-interface WebWebviewProps extends WebViewProps {
+export interface WebWebviewProps extends WebViewProps {
   title?: string;
 }
 
@@ -74,7 +74,7 @@ export const WebWebView = forwardRef<WebView, WebWebviewProps>((props, ref) => {
         },
         clearHistory: () => {},
         clearFormData: () => {},
-      } as unknown as WebView)
+      }) as unknown as WebView
   );
 
   useEffect(() => {
@@ -89,11 +89,15 @@ export const WebWebView = forwardRef<WebView, WebWebviewProps>((props, ref) => {
       window.removeEventListener("message", onMessage, true);
     };
   }, []);
+  // console.log("WebWebView1", props);
 
   return (
     <iframe
       title={title}
       ref={iframeRef}
+      src={
+        typeof source === "object" && "uri" in source ? source.uri : undefined
+      }
       srcDoc={_source}
       width={styleObj.width?.toString()}
       height={styleObj.height?.toString()}
