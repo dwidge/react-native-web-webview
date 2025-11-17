@@ -18,6 +18,16 @@ export interface WebWebviewProps extends WebViewProps {
 // This js adds a postMessage function to the webview
 const DEFAULT_INJECT_JS = `window.ReactNativeWebView = { postMessage: (...args) => window.parent.postMessage(args[0])}`;
 
+const NAVIGATION_INTERCEPTION_JS = `
+document.addEventListener('click', function(e) {
+  var anchor = e.target.closest('a');
+  if (anchor && anchor.href) {
+    e.preventDefault();
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'navigationStateChange', url: anchor.href, navigationType: 'click' }));
+  }
+}, true);
+`;
+
 export const WebWebView = forwardRef<WebView, WebWebviewProps>((props, ref) => {
   const { title, source, onLoad, scrollEnabled, style } = props;
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -31,17 +41,25 @@ export const WebWebView = forwardRef<WebView, WebWebviewProps>((props, ref) => {
     if ((source as WebViewSourceHtml).html) {
       const pageHtml = (source as WebViewSourceHtml).html;
       // Inject javascript
+      const navigationJs = props.onShouldStartLoadWithRequest
+        ? NAVIGATION_INTERCEPTION_JS
+        : "";
       const jsToInject = `${DEFAULT_INJECT_JS} ${
         props.injectedJavaScript ?? ""
-      } ${props.injectedJavaScriptBeforeContentLoaded ?? ""}`;
+      } ${props.injectedJavaScriptBeforeContentLoaded ?? ""} ${navigationJs}`;
       return replaceLast(
         pageHtml,
         "</body>",
-        `<script>${jsToInject}</script></body>`
+        `<script>${jsToInject}</script></body>`,
       );
     }
     return undefined;
-  }, []);
+  }, [
+    source,
+    props.injectedJavaScript,
+    props.injectedJavaScriptBeforeContentLoaded,
+    props.onShouldStartLoadWithRequest,
+  ]);
 
   // Initialize ref - most functions here are mocked - we should implement them
   useImperativeHandle(
@@ -74,21 +92,45 @@ export const WebWebView = forwardRef<WebView, WebWebviewProps>((props, ref) => {
         },
         clearHistory: () => {},
         clearFormData: () => {},
-      }) as unknown as WebView
+      }) as unknown as WebView,
   );
 
   useEffect(() => {
     // Listen for messages
-    if (!props.onMessage) return;
+    if (!props.onMessage && !props.onShouldStartLoadWithRequest) return;
     const onMessage = (nativeEvent: MessageEvent) => {
-      // @ts-ignore
-      return props.onMessage({ nativeEvent });
+      let data = nativeEvent.data;
+      if (typeof data === "string") {
+        try {
+          const parsedData = JSON.parse(data);
+          if (
+            parsedData.type === "navigationStateChange" &&
+            props.onShouldStartLoadWithRequest
+          ) {
+            // @ts-ignore
+            const shouldStart = props.onShouldStartLoadWithRequest({
+              url: parsedData.url,
+              navigationType: parsedData.navigationType,
+            });
+            if (shouldStart && iframeRef.current) {
+              iframeRef.current.src = parsedData.url;
+            }
+            return;
+          }
+        } catch (e) {
+          // not a special json message, fall through
+        }
+      }
+      if (props.onMessage) {
+        // @ts-ignore
+        return props.onMessage({ nativeEvent });
+      }
     };
     window.addEventListener("message", onMessage, true);
     return () => {
       window.removeEventListener("message", onMessage, true);
     };
-  }, []);
+  }, [props.onMessage, props.onShouldStartLoadWithRequest]);
   // console.log("WebWebView1", props);
 
   return (
